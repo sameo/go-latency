@@ -24,7 +24,7 @@ var worstLatency time.Duration
 var bestLatency time.Duration
 var averageLatency time.Duration
 
-func idleThread(b *buffer, cycles, period int, latencies *[]time.Duration, wg *sync.WaitGroup) {
+func idleThread(b *buffer, cycles, period, buffers int, latencies *[]time.Duration, wg *sync.WaitGroup) {
 	sleepPeriod := (time.Duration)(period) * time.Millisecond
 	bestLatency = time.Minute
 
@@ -34,7 +34,7 @@ func idleThread(b *buffer, cycles, period int, latencies *[]time.Duration, wg *s
 	for i:= 0; i < cycles; i++ {
 		bar.Increment()
 
-		for j := 0; j < 10; j++ {
+		for j := 0; j < buffers; j++ {
 			m := make(message, bufferSize)
 			for i := range m {
 				m[i] = byte(j)
@@ -67,13 +67,14 @@ func idleThread(b *buffer, cycles, period int, latencies *[]time.Duration, wg *s
 }
 
 func main() {
-	var wg sync.WaitGroup	
+	var wg sync.WaitGroup
 	var b buffer
 	var gcStats debug.GCStats
 	var latencies []time.Duration
 
 	cycles := flag.Int("cycles", 500, "number of sleeping cycles")
 	sleepPeriod := flag.Int("period", 100, "Sleeping period (in milliseconds)")
+	numBuffer := flag.Int("buffers", 10, "Number of allocated buffer per cycle")
 	debugPause := flag.Bool("debug", false, "Dump all GC pauses and latencies")
 	flag.Parse()
 
@@ -81,8 +82,8 @@ func main() {
 
 	wg.Add(1)
 
-	go idleThread(&b, *cycles, *sleepPeriod, &latencies, &wg)
-	
+	go idleThread(&b, *cycles, *sleepPeriod, *numBuffer, &latencies, &wg)
+
 	wg.Wait()
 
 	fmt.Printf("Latency: [Avg %vµs, Best %v, Worst %v]\n", (averageLatency.Nanoseconds()/(int64)(*cycles))/1000, bestLatency, worstLatency)
