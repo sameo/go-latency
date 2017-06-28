@@ -5,19 +5,50 @@
 
 #include <sys/time.h>
 
-static unsigned int worst_latency = 0;
-static unsigned int best_latency = 1000000L;
-static unsigned int sum_latency = 0;
+static unsigned long worst_latency = 0;
+static unsigned long best_latency = 1000000L;
+static unsigned long sum_latency = 0;
+static size_t buffer_size = 4096*10;
 
-static int idle_thread(int cycles, int period)
+static void free_buffers(char **buffers, int num_buffers) {
+	int i;
+
+	for (i = 0; i < num_buffers; i++) {
+		if (buffers[i] != NULL) {
+			free(buffers[i]);
+		}
+	}
+
+	free(buffers);
+}
+
+static int idle_thread(int cycles, int period, int num_buffers)
 {
 	struct timespec sleep, t0, t1;
-	int i, total_t0, total_t1, latency;
+	int i, j, k, total_t0, total_t1, latency;
+	char **buffers;
 
 	sleep.tv_sec = 0;
 	sleep.tv_nsec = period * 1000000L;
 
 	for (i = 0; i < cycles; i++) {
+		buffers = calloc(num_buffers, sizeof(char *));
+		if (buffers == NULL) {
+			return -1;
+		}
+
+		for (j = 0; j < num_buffers; j++) {
+			buffers[j] = calloc(buffer_size, sizeof(char));
+			if (buffers[j] == NULL) {
+				free_buffers(buffers, num_buffers);
+				return -1;
+			}
+
+			for (k = 0; k < buffer_size; k++) {
+				buffers[j][k] = k;
+			}
+		}
+
 
 		clock_gettime(CLOCK_REALTIME, &t0);
 		if(nanosleep(&sleep , NULL) < 0 )  {
@@ -39,6 +70,8 @@ static int idle_thread(int cycles, int period)
 		}
 
 		sum_latency += latency;
+
+		free_buffers(buffers, num_buffers);
 	}
 
 	return 0;
@@ -46,10 +79,13 @@ static int idle_thread(int cycles, int period)
 
 int main(int argc, char *argv[])
 {
-	int cycles = 500, period = 100, opt = 0;
+	int cycles = 500, period = 100, opt = 0, buffers = 10;
 
-	while ((opt = getopt(argc, argv, "c:p:")) != -1) {
+	while ((opt = getopt(argc, argv, "b:c:p:")) != -1) {
 		switch (opt) {
+		case 'b':
+			buffers = atoi(optarg);
+			break;
 		case 'c':
 			cycles = atoi(optarg);
 			break;
@@ -57,14 +93,14 @@ int main(int argc, char *argv[])
 			period = atoi(optarg);
 			break;
 		default:
-			fprintf(stderr, "Usage: %s [-cp]\n", argv[0]);
+			fprintf(stderr, "Usage: %s [-cpb]\n", argv[0]);
 			exit(EXIT_FAILURE);
 		}
 	}
 
-	printf("%ld cycles, %ld ms sleep period\n", cycles, period);
+	printf("%d cycles, %d ms sleep period\n", cycles, period);
 
-	if (idle_thread(cycles, period) < 0) {
+	if (idle_thread(cycles, period, buffers) < 0) {
 		exit(EXIT_FAILURE);
 	}
 
