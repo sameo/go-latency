@@ -37,6 +37,8 @@ func memoryThrasher(b *buffer) {
 func idleThread(cycles, period int, latencies *[]time.Duration, wg *sync.WaitGroup) {
 	sleepPeriod := (time.Duration)(period) * time.Millisecond
 
+	fmt.Println("Sleep period", sleepPeriod)
+	
 	defer wg.Done()
 	for i:= 0; i < cycles; i++ {
 		start := time.Now()
