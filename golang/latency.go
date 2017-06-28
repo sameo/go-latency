@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	bufferSize = 4096
+	bufferSize = 4096 * 10
 	windowSize = 200000
 )
 
@@ -23,23 +23,21 @@ var worstLatency time.Duration
 var bestLatency time.Duration
 var averageLatency time.Duration
 
-func memoryThrasher(b *buffer) {
-	for i := 0; ; i++ {
-		m := make(message, bufferSize)
-		for i := range m {
-			m[i] = byte(i)
-		}
-
-		(*b)[i%windowSize] = m
-	}
-}
-
-func idleThread(cycles, period int, latencies *[]time.Duration, wg *sync.WaitGroup) {
+func idleThread(b *buffer, cycles, period int, latencies *[]time.Duration, wg *sync.WaitGroup) {
 	sleepPeriod := (time.Duration)(period) * time.Millisecond
 	bestLatency = time.Minute
 
 	defer wg.Done()
 	for i:= 0; i < cycles; i++ {
+		for j := 0; j < 10; j++ {
+			m := make(message, bufferSize)
+			for i := range m {
+				m[i] = byte(j)
+			}
+
+			(*b)[j%windowSize] = m
+		}
+
 		start := time.Now()
 		time.Sleep(sleepPeriod)
 
@@ -76,8 +74,7 @@ func main() {
 
 	wg.Add(1)
 
-	go memoryThrasher(&b)
-	go idleThread(*cycles, *sleepPeriod, &latencies, &wg)
+	go idleThread(&b, *cycles, *sleepPeriod, &latencies, &wg)
 	
 	wg.Wait()
 
