@@ -30,7 +30,15 @@ var bufPool = sync.Pool{
 	},
 }
 
-func idleThread(b *buffer, cycles, period, buffers int, latencies *[]time.Duration, wg *sync.WaitGroup) {
+func newMessage(pool bool) message {
+	if pool {
+		return bufPool.Get().(message)
+	}
+
+	return make(message, bufferSize)
+}
+
+func idleThread(b *buffer, cycles, period, buffers int, usePool bool, latencies *[]time.Duration, wg *sync.WaitGroup) {
 	sleepPeriod := (time.Duration)(period) * time.Millisecond
 	bestLatency = time.Minute
 
@@ -41,12 +49,12 @@ func idleThread(b *buffer, cycles, period, buffers int, latencies *[]time.Durati
 		bar.Increment()
 
 		for j := 0; j < buffers; j++ {
-			m := bufPool.Get().(message)
+			m := newMessage(usePool)
 			for i := range m {
 				m[i] = byte(j)
 			}
 
-			if (*b)[j%windowSize] != nil {
+			if (*b)[j%windowSize] != nil && usePool {
 				bufPool.Put((*b)[j%windowSize])
 			}
 			(*b)[j%windowSize] = m
@@ -71,9 +79,11 @@ func idleThread(b *buffer, cycles, period, buffers int, latencies *[]time.Durati
 
 		*latencies = append(*latencies, latency)
 
-		for j := 0; j < buffers; j++ {
-			bufPool.Put((*b)[j])
-			(*b)[j%windowSize] = nil
+		if usePool {
+			for j := 0; j < buffers; j++ {
+				bufPool.Put((*b)[j])
+				(*b)[j%windowSize] = nil
+			}
 		}
 	}
 
@@ -89,14 +99,16 @@ func main() {
 	cycles := flag.Int("cycles", 500, "number of sleeping cycles")
 	sleepPeriod := flag.Int("period", 100, "Sleeping period (in milliseconds)")
 	numBuffer := flag.Int("buffers", 10, "Number of allocated buffer per cycle")
+	usePool := flag.Bool("no-pool", false, "Do not use golang pools for memory allocations")
 	debugPause := flag.Bool("debug", false, "Dump all GC pauses and latencies")
 	flag.Parse()
 
-	fmt.Printf("%d cycles, %dms sleep period:\n", *cycles, *sleepPeriod)
+	fmt.Printf("%d cycles - %dms sleep period - %d buffers allocated per cycle - Golang pools %v\n",
+		*cycles, *sleepPeriod, *numBuffer, !(*usePool))
 
 	wg.Add(1)
 
-	go idleThread(&b, *cycles, *sleepPeriod, *numBuffer, &latencies, &wg)
+	go idleThread(&b, *cycles, *sleepPeriod, *numBuffer, !(*usePool), &latencies, &wg)
 
 	wg.Wait()
 
