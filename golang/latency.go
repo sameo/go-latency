@@ -36,9 +36,8 @@ func memoryThrasher(b *buffer) {
 
 func idleThread(cycles, period int, latencies *[]time.Duration, wg *sync.WaitGroup) {
 	sleepPeriod := (time.Duration)(period) * time.Millisecond
+	bestLatency = time.Minute
 
-	fmt.Println("Sleep period", sleepPeriod)
-	
 	defer wg.Done()
 	for i:= 0; i < cycles; i++ {
 		start := time.Now()
@@ -69,7 +68,8 @@ func main() {
 	var latencies []time.Duration
 
 	cycles := flag.Int("cycles", 500, "number of sleeping cycles")
-	sleepPeriod := flag.Int("sleep", 100, "Sleeping period (in milliseconds)")
+	sleepPeriod := flag.Int("period", 100, "Sleeping period (in milliseconds)")
+	debugPause := flag.Bool("debug", false, "Dump all GC pauses and latencies")
 	flag.Parse()
 
 	fmt.Printf("%d cycles, %dms sleep period:\n", *cycles, *sleepPeriod)
@@ -81,18 +81,20 @@ func main() {
 	
 	wg.Wait()
 
-	fmt.Printf("\tWorst latency: %v\n", worstLatency)
-	fmt.Printf("\tBest latency: %v\n", bestLatency)
-	fmt.Printf("\tAverage latency: %vµs\n", (averageLatency.Nanoseconds()/(int64)(*cycles))/1000)
-	fmt.Printf("\tLatencies: %v\n", latencies)
+	fmt.Printf("Latency: [Avg %vµs, Best %v, Worst %v]\n", (averageLatency.Nanoseconds()/(int64)(*cycles))/1000, bestLatency, worstLatency)
+
+	if *debugPause {
+		fmt.Printf("Latencies: %v\n", latencies)
+	}
 
 	debug.ReadGCStats(&gcStats)
 
 	fmt.Printf("\nGC Stats:\n")
-	fmt.Printf("\tLast GC run %v\n", gcStats.LastGC)
+
 	fmt.Printf("\tNumber of GC runs %v\n", gcStats.NumGC)
 	fmt.Printf("\tTotal GC pause time %v\n", gcStats.PauseTotal)
 
-//	sort.Sort(gcStats.Pause)
-	fmt.Printf("\tSorted pauses: %v\n", gcStats.Pause)
+	if *debugPause {
+		fmt.Printf("\tGC pauses: %v\n", gcStats.Pause)
+	}
 }
