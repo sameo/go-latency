@@ -24,6 +24,12 @@ var worstLatency time.Duration
 var bestLatency time.Duration
 var averageLatency time.Duration
 
+var bufPool = sync.Pool{
+	New: func() interface{} {
+		return make(message, bufferSize)
+	},
+}
+
 func idleThread(b *buffer, cycles, period, buffers int, latencies *[]time.Duration, wg *sync.WaitGroup) {
 	sleepPeriod := (time.Duration)(period) * time.Millisecond
 	bestLatency = time.Minute
@@ -35,11 +41,14 @@ func idleThread(b *buffer, cycles, period, buffers int, latencies *[]time.Durati
 		bar.Increment()
 
 		for j := 0; j < buffers; j++ {
-			m := make(message, bufferSize)
+			m := bufPool.Get().(message)
 			for i := range m {
 				m[i] = byte(j)
 			}
 
+			if (*b)[j%windowSize] != nil {
+				bufPool.Put((*b)[j%windowSize])
+			}
 			(*b)[j%windowSize] = m
 		}
 
@@ -61,6 +70,11 @@ func idleThread(b *buffer, cycles, period, buffers int, latencies *[]time.Durati
 		}
 
 		*latencies = append(*latencies, latency)
+
+		for j := 0; j < buffers; j++ {
+			bufPool.Put((*b)[j])
+			(*b)[j%windowSize] = nil
+		}
 	}
 
 	bar.FinishPrint("Done")
