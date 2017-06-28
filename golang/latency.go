@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"flag"
 	"runtime/debug"
-//	"sort"
 	"sync"
 	"time"
+
+	"gopkg.in/cheggaaa/pb.v1"
 )
 
 const (
@@ -28,7 +29,11 @@ func idleThread(b *buffer, cycles, period int, latencies *[]time.Duration, wg *s
 	bestLatency = time.Minute
 
 	defer wg.Done()
+	bar := pb.StartNew(cycles)
+
 	for i:= 0; i < cycles; i++ {
+		bar.Increment()
+
 		for j := 0; j < 10; j++ {
 			m := make(message, bufferSize)
 			for i := range m {
@@ -57,6 +62,8 @@ func idleThread(b *buffer, cycles, period int, latencies *[]time.Duration, wg *s
 
 		*latencies = append(*latencies, latency)
 	}
+
+	bar.FinishPrint("Done")
 }
 
 func main() {
