@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"gopkg.in/cheggaaa/pb.v1"
+	"gopkg.in/cheggaaa/pb.v2"
 )
 
 const (
@@ -39,11 +39,14 @@ func newMessage(pool bool) message {
 }
 
 func idleThread(b *buffer, cycles, period, buffers int, usePool bool, latencies *[]time.Duration, wg *sync.WaitGroup) {
+	var templ pb.ProgressBarTemplate = `{{string . "Cycles"}}{{counters . }} {{bar . }} {{percent . }}{{string . ""}}`
 	sleepPeriod := (time.Duration)(period) * time.Millisecond
 	bestLatency = time.Minute
 
 	defer wg.Done()
+
 	bar := pb.StartNew(cycles)
+	bar = bar.SetTemplate(templ) 
 
 	for i:= 0; i < cycles; i++ {
 		bar.Increment()
@@ -87,7 +90,7 @@ func idleThread(b *buffer, cycles, period, buffers int, usePool bool, latencies 
 		}
 	}
 
-	bar.FinishPrint("Done")
+	bar.Finish()
 }
 
 func main() {
