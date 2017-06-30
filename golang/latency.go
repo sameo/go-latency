@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wcharczuk/go-chart"
 	"gopkg.in/cheggaaa/pb.v2"
 )
 
@@ -40,6 +41,48 @@ func storeLatencies(path string, latencies []time.Duration) error {
 			return err
 		}
 	}
+
+	return nil
+}
+
+func generateGraph(path string, latencies []time.Duration) error {
+	var XValues, YValues []float64
+	for i, v := range latencies {
+		XValues = append(XValues, float64(i))
+		YValues = append(YValues, float64(v)/1000)
+	}
+
+	graph := chart.Chart{
+		Title:      fmt.Sprintf("Go scheduling latency: cycles %d", len(latencies)),
+		TitleStyle: chart.StyleShow(),
+		XAxis: chart.XAxis{
+			Name:      "Iteration",
+			NameStyle: chart.StyleShow(),
+			Style:     chart.StyleShow(),
+		},
+		YAxis: chart.YAxis{
+			Name:      "Latency (µs)",
+			NameStyle: chart.StyleShow(),
+			Style:     chart.StyleShow(),
+		},
+		Series: []chart.Series{
+			chart.ContinuousSeries{
+				XValues: XValues,
+				YValues: YValues,
+			},
+		},
+	}
+
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+
+	if err := graph.Render(chart.PNG, f); err != nil {
+		fmt.Println("Error rendering the graph file")
+	}
+
+	defer f.Close()
 
 	return nil
 }
@@ -121,7 +164,8 @@ func idleThread(b *buffer, cycles, period, buffers int, usePool, progressBar boo
 	}
 
 	if latenciesFile != "" {
-		storeLatencies(latenciesFile, latenciesArray)
+		generateGraph(latenciesFile, latenciesArray)
+		storeLatencies(latenciesFile + ".txt", latenciesArray)
 	}
 }
 
