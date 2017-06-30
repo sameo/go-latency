@@ -45,7 +45,7 @@ func storeLatencies(path string, latencies []time.Duration) error {
 	return nil
 }
 
-func generateGraph(path string, latencies []time.Duration) error {
+func generateGraph(path string, latencies []time.Duration, usePool bool) error {
 	var XValues, YValues []float64
 	for i, v := range latencies {
 		XValues = append(XValues, float64(i))
@@ -53,7 +53,7 @@ func generateGraph(path string, latencies []time.Duration) error {
 	}
 
 	graph := chart.Chart{
-		Title:      fmt.Sprintf("Go scheduling latency: cycles %d", len(latencies)),
+		Title:      fmt.Sprintf("Go latency: cycles %d (pools %v)", len(latencies), usePool),
 		TitleStyle: chart.StyleShow(),
 		XAxis: chart.XAxis{
 			Name:      "Iteration",
@@ -164,7 +164,7 @@ func idleThread(b *buffer, cycles, period, buffers int, usePool, progressBar boo
 	}
 
 	if latenciesFile != "" {
-		generateGraph(latenciesFile, latenciesArray)
+		generateGraph(latenciesFile, latenciesArray, usePool)
 		storeLatencies(latenciesFile + ".txt", latenciesArray)
 	}
 }
