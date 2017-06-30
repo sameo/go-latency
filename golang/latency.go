@@ -58,19 +58,24 @@ func newMessage(pool bool) message {
 	return make(message, bufferSize)
 }
 
-func idleThread(b *buffer, cycles, period, buffers int, usePool bool, latenciesFile string, wg *sync.WaitGroup) {
+func idleThread(b *buffer, cycles, period, buffers int, usePool, progressBar bool, latenciesFile string, wg *sync.WaitGroup) {
 	var templ pb.ProgressBarTemplate = `{{string . "Cycles"}}{{counters . }} {{bar . }} {{percent . }}{{string . ""}}`
 	var latenciesArray []time.Duration
+	var bar *pb.ProgressBar
 	sleepPeriod := (time.Duration)(period) * time.Millisecond
 	bestLatency = time.Minute
 
 	defer wg.Done()
 
-	bar := pb.StartNew(cycles)
-	bar = bar.SetTemplate(templ) 
+	if progressBar {
+		bar = pb.StartNew(cycles)
+		bar = bar.SetTemplate(templ)
+	}
 
 	for i:= 0; i < cycles; i++ {
-		bar.Increment()
+		if progressBar {
+			bar.Increment()
+		}
 
 		for j := 0; j < buffers; j++ {
 			m := newMessage(usePool)
@@ -111,7 +116,9 @@ func idleThread(b *buffer, cycles, period, buffers int, usePool bool, latenciesF
 		}
 	}
 
-	bar.Finish()
+	if progressBar {
+		bar.Finish()
+	}
 
 	if latenciesFile != "" {
 		storeLatencies(latenciesFile, latenciesArray)
@@ -129,6 +136,7 @@ func main() {
 	usePool := flag.Bool("no-pool", false, "Do not use golang pools for memory allocations")
 	debugPause := flag.Bool("debug", false, "Dump all GC pauses and latencies")
 	latenciesFile := flag.String("file", "", "File to store all latencies in microseconds")
+	progressBar := flag.Bool("progress", false, "Display progress bar")
 	flag.Parse()
 
 	fmt.Printf("%d cycles - %dms sleep period - %d buffers allocated per cycle - Golang pools %v\n",
@@ -136,7 +144,7 @@ func main() {
 
 	wg.Add(1)
 
-	go idleThread(&b, *cycles, *sleepPeriod, *numBuffer, !(*usePool), *latenciesFile, &wg)
+	go idleThread(&b, *cycles, *sleepPeriod, *numBuffer, !(*usePool), *progressBar, *latenciesFile, &wg)
 
 	wg.Wait()
 
