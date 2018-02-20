@@ -1,0 +1,9 @@
+[package]
+name = "latency"
+version = "0.1.0"
+authors = ["Samuel Ortiz <sameo@linux.intel.com>"]
+
+[dependencies]
+
+clap = "2.30.0"
+bytes = "0.4.6"
