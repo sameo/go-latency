@@ -6,26 +6,26 @@ use std::str::FromStr;
 
 const BUFFER_SIZE: usize = 4096*10;
 
-fn allocate_and_sleep(period_millis: u64) -> u64 {
+fn allocate_and_sleep(allocation: bool, period_millis: u64) -> u64 {
 
-    for _i in 1..10 {
-        let mut vec: Vec<u32> = Vec::with_capacity(BUFFER_SIZE);
-        for _j in 0..BUFFER_SIZE {
-            vec.push(_j as u32)
+    if allocation {
+        for _i in 1..10 {
+            let mut vec: Vec<u32> = Vec::with_capacity(BUFFER_SIZE);
+            for _j in 0..BUFFER_SIZE {
+                vec.push(_j as u32)
+            }
         }
     }
 
     let period_duration = time::Duration::from_millis(period_millis);
-    let period = (period_duration.as_secs() * 1000000000) +  (period_duration.subsec_nanos() as u64);
 
     let now = time::Instant::now();
     thread::sleep(period_duration);
     let elapsed = now.elapsed();
 
-    let period_elapsed = (elapsed.as_secs() * 1000000000) +  (elapsed.subsec_nanos() as u64);    
-    let latency = period_elapsed - period;
+    let t = elapsed - period_duration;
 
-    return latency;
+    u64::from(t.subsec_nanos())
 }
 
 fn main() {
@@ -42,6 +42,10 @@ fn main() {
              .value_name("period in milliseconds")
              .help("Thread sleeping period")
              .takes_value(true))
+        .arg(Arg::with_name("allocation")
+             .short("a")
+             .long("alloc")
+             .help("Allocate memory on the heap"))
         .get_matches();
 
     let c = matches.value_of("cycles").unwrap();
@@ -50,12 +54,17 @@ fn main() {
     let p = matches.value_of("period").unwrap();
     let period = u64::from_str(p).unwrap();
 
+    let mut allocation = false;
+    if matches.is_present("allocation") {
+        allocation = true;
+    }
+
     let mut sum_latency = 0;
     let mut worst_latency = 0;
     let mut best_latency = 1000000000;
     
     for _i in 1..cycles {
-        let latency = allocate_and_sleep(period);
+        let latency = allocate_and_sleep(allocation, period);
         if latency < best_latency {
             best_latency = latency
         }
